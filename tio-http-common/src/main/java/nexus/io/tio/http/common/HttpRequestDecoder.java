@@ -18,6 +18,7 @@ import nexus.io.tio.core.ChannelContext;
 import nexus.io.tio.core.Node;
 import nexus.io.tio.core.Tio;
 import nexus.io.tio.core.exception.TioDecodeException;
+import nexus.io.tio.core.exception.UnsupportedHttpMethodException;
 import nexus.io.tio.core.utils.IpBlacklistUtils;
 import nexus.io.tio.http.common.HttpConst.RequestBodyFormat;
 import nexus.io.tio.http.common.utils.HttpIpUtils;
@@ -573,7 +574,7 @@ public class HttpRequestDecoder {
           RequestLine requestLine = new RequestLine();
           HttpMethod method = HttpMethod.from(methodStr);
           if (method == null) {
-            throw new TioDecodeException("Unsupported HTTP method: " + methodStr);
+            throw new UnsupportedHttpMethodException(methodStr);
           }
           requestLine.setMethod(method);
           requestLine.setPath(pathStr);

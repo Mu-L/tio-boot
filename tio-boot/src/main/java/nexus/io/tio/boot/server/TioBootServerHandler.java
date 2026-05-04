@@ -15,12 +15,17 @@ import nexus.io.constants.ServerProtocol;
 import nexus.io.http.common.HttpResponsePacket;
 import nexus.io.tio.boot.decode.TioDecodeExceptionHandler;
 import nexus.io.tio.core.ChannelContext;
+import nexus.io.tio.core.Tio;
 import nexus.io.tio.core.TioConfig;
 import nexus.io.tio.core.exception.TioDecodeException;
+import nexus.io.tio.core.exception.UnsupportedHttpMethodException;
+import nexus.io.tio.http.common.HeaderName;
+import nexus.io.tio.http.common.HeaderValue;
 import nexus.io.tio.http.common.HttpConfig;
 import nexus.io.tio.http.common.HttpRequest;
 import nexus.io.tio.http.common.HttpRequestDecoder;
 import nexus.io.tio.http.common.HttpResponse;
+import nexus.io.tio.http.common.HttpResponseStatus;
 import nexus.io.tio.http.common.RequestHeaderUpgrade;
 import nexus.io.tio.http.common.handler.ITioHttpRequestHandler;
 import nexus.io.tio.http.server.HttpServerAioHandler;
@@ -136,6 +141,9 @@ public class TioBootServerHandler implements ServerAioHandler {
       HttpRequest request;
       try {
         request = HttpRequestDecoder.decode(buffer, limit, position, readableLength, channelContext, httpConfig);
+      } catch (UnsupportedHttpMethodException e) {
+        handleUnsupportedHttpMethod(channelContext, e);
+        return null;
       } catch (TioDecodeException e) {
         if (serverAioHandler != null) {
           return serverAioHandler.decode(buffer, limit, position, readableLength, channelContext);
@@ -180,6 +188,9 @@ public class TioBootServerHandler implements ServerAioHandler {
     HttpRequest request;
     try {
       request = HttpRequestDecoder.decode(buffer, limit, position, readableLength, channelContext, httpConfig);
+    } catch (UnsupportedHttpMethodException e) {
+      handleUnsupportedHttpMethod(channelContext, e);
+      return null;
     } catch (TioDecodeException e) {
 
       if (tioDecodeExceptionHandler != null) {
@@ -211,6 +222,9 @@ public class TioBootServerHandler implements ServerAioHandler {
       HttpRequest request;
       try {
         request = HttpRequestDecoder.decode(buffer, limit, position, readableLength, channelContext, httpConfig);
+      } catch (UnsupportedHttpMethodException e) {
+        handleUnsupportedHttpMethod(channelContext, e);
+        return null;
       } catch (TioDecodeException e) {
         if (tioDecodeExceptionHandler != null) {
           tioDecodeExceptionHandler.handle(buffer, channelContext, httpConfig, e);
@@ -245,6 +259,16 @@ public class TioBootServerHandler implements ServerAioHandler {
   private Packet tcpDecode(ByteBuffer buffer, int limit, int position, int readableLength,
       ChannelContext channelContext) throws Exception {
     return serverAioHandler.decode(buffer, limit, position, readableLength, channelContext);
+  }
+
+  private void handleUnsupportedHttpMethod(ChannelContext channelContext, UnsupportedHttpMethodException e) {
+    log.error("Decode exception occurred: {}", e.getMessage());
+    HttpResponse response = new HttpResponse();
+    response.setStatus(HttpResponseStatus.C405);
+    response.addHeader(HeaderName.Connection, HeaderValue.Connection.close);
+    response.setBody(e.getMessage().getBytes());
+    Tio.send(channelContext, response);
+    Tio.remove(channelContext, "Unsupported HTTP method: " + e.getMethod());
   }
 
   /**
