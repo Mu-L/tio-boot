@@ -262,7 +262,7 @@ public class TioBootServerHandler implements ServerAioHandler {
   }
 
   private void handleUnsupportedHttpMethod(ChannelContext channelContext, UnsupportedHttpMethodException e) {
-    log.error("Decode exception occurred: {}", e.getMessage());
+    log.warn("Decode exception occurred: {}", e.getMessage());
     HttpResponse response = new HttpResponse();
     response.setStatus(HttpResponseStatus.C405);
     response.addHeader(HeaderName.Connection, HeaderValue.Connection.close);

@@ -29,7 +29,7 @@ import nexus.io.tio.utils.hutool.StrUtil;
 public class HttpRequestDecoder {
 
   private static Logger log = LoggerFactory.getLogger(HttpRequestDecoder.class);
-  
+
   // 头部，最多有多少字节
   public static final int MAX_LENGTH_OF_HEADER = 20480;
 
@@ -54,8 +54,8 @@ public class HttpRequestDecoder {
    * @return
    * @throws TioDecodeException
    */
-  public static HttpRequest decode(ByteBuffer buffer, int limit, int position, int readableLength, ChannelContext channelContext,
-      HttpConfig httpConfig) throws TioDecodeException {
+  public static HttpRequest decode(ByteBuffer buffer, int limit, int position, int readableLength,
+      ChannelContext channelContext, HttpConfig httpConfig) throws TioDecodeException {
     if (PRINT_PACKET) {
       buffer.mark();
       String request = StandardCharsets.UTF_8.decode(buffer).toString();
@@ -87,8 +87,10 @@ public class HttpRequestDecoder {
     } else {
       contentLength = Integer.parseInt(contentLengthStr);
       if (contentLength > httpConfig.getMaxLengthOfPostBody()) {
-        String message = "post body length is too big[" + contentLength + "], max length is " + httpConfig.getMaxLengthOfPostBody()
-            + " byte";
+        long maxLength = httpConfig.getMaxLengthOfPostBody();
+        String message = "Request body is too large. " + "Current size: " + contentLength + " bytes ("
+            + formatSize(contentLength) + "), " + "max allowed: " + maxLength + " bytes (" + formatSize(maxLength)
+            + ").";
         log.error(message);
         HttpResponse httpResponse = new HttpResponse();
         httpResponse.setStatus(413);
@@ -181,7 +183,8 @@ public class HttpRequestDecoder {
     httpRequest.setKeepConnection(keepAlive);
 
     if (StrUtil.isNotBlank(firstLine.queryString)) {
-      boolean decodeParams = decodeParams(httpRequest.getParams(), firstLine.queryString, httpRequest.getCharset(), channelContext);
+      boolean decodeParams = decodeParams(httpRequest.getParams(), firstLine.queryString, httpRequest.getCharset(),
+          channelContext);
       if (!decodeParams) {
         return null;
       }
@@ -208,8 +211,8 @@ public class HttpRequestDecoder {
    * @author tanyaowu
    * @throws TioDecodeException
    */
-  public static boolean decodeParams(Map<String, Object[]> params, String queryString, String charset, ChannelContext channelContext)
-      throws TioDecodeException {
+  public static boolean decodeParams(Map<String, Object[]> params, String queryString, String charset,
+      ChannelContext channelContext) throws TioDecodeException {
     if (StrUtil.isBlank(queryString)) {
       return true;
     }
@@ -281,8 +284,8 @@ public class HttpRequestDecoder {
    * @param httpConfig
    * @throws TioDecodeException
    */
-  private static void parseBody(HttpRequest httpRequest, RequestLine firstLine, byte[] bodyBytes, ChannelContext channelContext,
-      HttpConfig httpConfig) throws TioDecodeException {
+  private static void parseBody(HttpRequest httpRequest, RequestLine firstLine, byte[] bodyBytes,
+      ChannelContext channelContext, HttpConfig httpConfig) throws TioDecodeException {
     parseBodyFormat(httpRequest, httpRequest.getHeaders());
     RequestBodyFormat bodyFormat = httpRequest.getBodyFormat();
 
@@ -448,8 +451,8 @@ public class HttpRequestDecoder {
    * @return
    * @throws TioDecodeException
    */
-  public static boolean parseHeader(ByteBuffer buffer, Map<String, String> headers, int hasReceivedHeaderLength, HttpConfig httpConfig)
-      throws TioDecodeException {
+  public static boolean parseHeader(ByteBuffer buffer, Map<String, String> headers, int hasReceivedHeaderLength,
+      HttpConfig httpConfig) throws TioDecodeException {
     // 循环读取每一行 header
     while (true) {
       // 如果没有足够数据来读取一行，则返回 false
@@ -463,7 +466,8 @@ public class HttpRequestDecoder {
       }
       // 检查单行长度是否超出限制
       if (line.length() > MAX_LENGTH_OF_HEADERLINE) {
-        throw new TioDecodeException("header line is too long, max length of header line is " + MAX_LENGTH_OF_HEADERLINE);
+        throw new TioDecodeException(
+            "header line is too long, max length of header line is " + MAX_LENGTH_OF_HEADERLINE);
       }
       // 累计 header 总长度检查
       hasReceivedHeaderLength += line.getBytes(StandardCharsets.UTF_8).length + 2; // 加上 CRLF
@@ -488,7 +492,8 @@ public class HttpRequestDecoder {
    * @param line           GET /tio?value=tanyaowu HTTP/1.1
    * @param channelContext
    */
-  public static RequestLine parseRequestLine(ByteBuffer buffer, ChannelContext channelContext) throws TioDecodeException {
+  public static RequestLine parseRequestLine(ByteBuffer buffer, ChannelContext channelContext)
+      throws TioDecodeException {
     byte[] allbs;
     int offset; // 用来统一索引偏移
 
@@ -596,11 +601,32 @@ public class HttpRequestDecoder {
   }
 
   /**
-   * 解析URLENCODED格式的消息体 形如： 【Content-Type : application/x-www-form-urlencoded;charset=UTF-8】
+   * 解析URLENCODED格式的消息体 形如： 【Content-Type :
+   * application/x-www-form-urlencoded;charset=UTF-8】
+   * 
    * @throws TioDecodeException
    */
-  private static void parseUrlencoded(HttpRequest httpRequest, RequestLine firstLine, byte[] bodyBytes, String bodyString,
-      ChannelContext channelContext) throws TioDecodeException {
+  private static void parseUrlencoded(HttpRequest httpRequest, RequestLine firstLine, byte[] bodyBytes,
+      String bodyString, ChannelContext channelContext) throws TioDecodeException {
     decodeParams(httpRequest.getParams(), bodyString, httpRequest.getCharset(), channelContext);
+  }
+
+  private static String formatSize(long bytes) {
+    if (bytes < 1024) {
+      return bytes + " B";
+    }
+
+    double kb = bytes / 1024.0;
+    if (kb < 1024) {
+      return String.format("%.2f KB", kb);
+    }
+
+    double mb = kb / 1024.0;
+    if (mb < 1024) {
+      return String.format("%.2f MB", mb);
+    }
+
+    double gb = mb / 1024.0;
+    return String.format("%.2f GB", gb);
   }
 }
